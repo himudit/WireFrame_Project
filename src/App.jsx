@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Activity, Droplet, Users } from 'lucide-react';
+import wsi from './assets/wsi.png'
 
 function App() {
   const [isHovered, setIsHovered] = useState(false);
-  
+
+  const [zoomLevel, setZoomLevel] = useState(1); // Initial zoom level
+  const imageRef = useRef(null); // Ref for the image element
+  const [lastTouchDistance, setLastTouchDistance] = useState(null);
+
   const currentDate = new Date().toLocaleString('en-US', {
     weekday: 'short',
     year: 'numeric',
@@ -14,6 +19,73 @@ function App() {
     second: '2-digit',
     hour12: false
   });
+
+  // Handle Mouse Wheel Zoom
+  const handleWheel = (event) => {
+    event.preventDefault(); // Prevent page scroll
+
+    const zoomFactor = 0.1;
+    if (event.deltaY < 0) {
+      // Zoom in
+      setZoomLevel((prevZoom) => Math.min(prevZoom + zoomFactor, 3)); // Max zoom level 3
+    } else {
+      // Zoom out
+      setZoomLevel((prevZoom) => Math.max(prevZoom - zoomFactor, 0.5)); // Min zoom level 0.5
+    }
+  };
+
+  // Handle Touch Pinch Zoom (for mobile)
+  const handleTouchStart = (event) => {
+    if (event.touches.length === 2) {
+      const distance = getDistance(event.touches[0], event.touches[1]);
+      setLastTouchDistance(distance);
+    }
+  };
+
+  const handleTouchMove = (event) => {
+    event.preventDefault(); // Prevent page scroll on touchmove
+
+    if (event.touches.length === 2 && lastTouchDistance !== null) {
+      const currentDistance = getDistance(event.touches[0], event.touches[1]);
+      const distanceChange = currentDistance - lastTouchDistance;
+
+      if (distanceChange > 0) {
+        setZoomLevel((prevZoom) => Math.min(prevZoom + 0.05, 3)); // Zoom in
+      } else if (distanceChange < 0) {
+        setZoomLevel((prevZoom) => Math.max(prevZoom - 0.05, 0.5)); // Zoom out
+      }
+
+      setLastTouchDistance(currentDistance); // Update distance
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setLastTouchDistance(null);
+  };
+
+  // Helper function to calculate distance between two touch points
+  const getDistance = (touch1, touch2) => {
+    const dx = touch2.clientX - touch1.clientX;
+    const dy = touch2.clientY - touch1.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // Attach wheel event listener
+  useEffect(() => {
+    const imageElement = imageRef.current;
+
+    imageElement.addEventListener('wheel', handleWheel, { passive: false });
+    imageElement.addEventListener('touchstart', handleTouchStart);
+    imageElement.addEventListener('touchmove', handleTouchMove, { passive: false });
+    imageElement.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      imageElement.removeEventListener('wheel', handleWheel);
+      imageElement.removeEventListener('touchstart', handleTouchStart);
+      imageElement.removeEventListener('touchmove', handleTouchMove);
+      imageElement.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [lastTouchDistance]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 p-6">
@@ -137,13 +209,14 @@ function App() {
 
           {/* Right Column */}
           <div className="space-y-8">
-            <div 
+            <div
               className="card-3d border border-emerald-100 rounded-2xl p-6 bg-white"
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
             >
               <h2 className="text-center font-semibold text-emerald-700 text-xl mb-4">WSI</h2>
-              <h3 className="text-center text-lg text-emerald-600 mb-2">Zoomed out View</h3>
+              {/* <h3 className="text-center text-lg text-emerald-600 mb-2">Zoomed out View</h3> */}
+              <img src={wsi} className='w-[40rem] h-[20rem]'></img>
               <p className="text-center text-emerald-500 mb-6">(Hub)</p>
               <div className="border-t border-emerald-100 mt-4 pt-4">
                 <div className="grid grid-cols-2 gap-6">
@@ -155,7 +228,15 @@ function App() {
 
             <div className="card-3d border border-cyan-100 rounded-2xl p-6 bg-white">
               <h2 className="text-center font-semibold text-cyan-700 text-xl mb-4">WSI</h2>
-              <h3 className="text-center text-lg text-cyan-600">Zoomed IN View</h3>
+              <div className="relative w-full max-w-md overflow-hidden border rounded shadow-lg">
+                <img
+                  ref={imageRef}
+                  src={wsi}
+                  alt="Zoomable"
+                  className="transition-transform duration-300 ease-in-out"
+                  style={{ transform: `scale(${zoomLevel})` }}
+                />
+              </div>
               <div className="mt-4 h-40 bg-cyan-50/30 rounded-lg flex items-center justify-center">
                 <div className="animate-float">
                   <Activity className="w-12 h-12 text-cyan-500" />
